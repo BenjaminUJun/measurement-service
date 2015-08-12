@@ -116,15 +116,15 @@ def run(sid,port):
 
   #ip and port of servr
   #by default http server port is 8000
-  server_address = ("sonic"+str(sid)+".cs.cornell.edu",port)
+  server_address = ('10.0.0.'+str(sid),port)
   httpd = HTTPServer(server_address, MyHandler)
-  print('SoNIC'+str(sid)+' server is listenning on port:'+str(port))
+  print('server is listenning on host '+str(sid)+':'+str(port))
   httpd.serve_forever()
   
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='This is SoNIC server')
   parser.add_argument('-p','--port',help='server listen port',default=8000)
-  parser.add_argument('-i','--sid',help='sonic server id', required=True)
+  parser.add_argument('-i','--sid',help='server id', required=True)
   args = parser.parse_args()
   
   run(int(args.sid),int(args.port))

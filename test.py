@@ -1,7 +1,7 @@
 import requests, subprocess
 
 print '[test counter configuration...]'
-url = "http://sonic3.cs.cornell.edu:8000"
+url = "http://10.0.0.1:8000"
 data = {}
 data['type'] = 'config counter'
 data['interface'] = 'INPUT'
@@ -11,10 +11,10 @@ print "sending to" + url + " " + str(data)
 response = requests.post(url, data = data)
 print response.text
 
-subprocess.call('timeout 3 ping google.com', shell=True)
+subprocess.call('timeout 3 ping 10.0.0.2', shell=True)
 
 print '[test counter querying...]'
-url = "http://sonic3.cs.cornell.edu:8000"
+url = "http://10.0.0.1:8000"
 data = {}
 data['type'] = 'query counter'
 data['proto'] = 'icmp'
@@ -23,7 +23,7 @@ response = requests.post(url, data = data)
 print response.text
 
 print '[test sketch configuration...]'
-url = "http://sonic3.cs.cornell.edu:8000"
+url = "http://10.0.0.1:8000"
 data = {}
 data['type'] = 'config sketch'
 data['interface'] = 'INPUT'
