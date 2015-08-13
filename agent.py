@@ -70,10 +70,10 @@ def do_bw_estimate(post_msg):
   
   return
 
-def handle_sketch_query(args):
+def send_to_monitor(args):
   port = 9000
   url = 'http://127.0.0.1:' + str(port) 
-  response = requests.post(url, data = args)
+  response = requests.post(url, data=args)
   return response.text
 
 class MyHandler(BaseHTTPRequestHandler):
@@ -81,25 +81,40 @@ class MyHandler(BaseHTTPRequestHandler):
     self.query_string = self.rfile.read(int(self.headers['Content-Length']))  
     self.args = dict(cgi.parse_qsl(self.query_string))
     response = "NULL"
-    if "type" in self.args:
-      msg_type = self.args["type"]
+    if 'type' in self.args:
+      msg_type = self.args['type']
     else:
       self.send_response(200)
       self.end_headers()
       self.wfile.write("No message type indicated.")
       return
 
-    if(msg_type == 'est_req'):
+    if msg_type == 'est_req':
       thread.start_new_thread(do_bw_estimate,(self.args,))
       response = "Started Bandwidth Estimation"
-    if(msg_type == 'rcv_req'):
+    if msg_type == 'rcv_req':
       response = receive_probe(self.args)
-    if(msg_type == 'config counter'):
+    # handle traffic monitoring messages
+    if msg_type == 'config counter':
+      for i,val in enumerate(leaf_agent):
+        url = '10.0.0.'+str(val)+':8000'
+        requests.post(url,data=self.args)
       response = iptables.install_rules(self.args)  
-    if(msg_type == 'query counter'):
-      response = iptables.read_counter(self.args)
-    if(msg_type == 'query sketch'):
-      response = handle_sketch_query(self.args)
+    if msg_type == 'query counter':
+      [pkts_num,bytes_num] = iptables.read_counter(self.args)
+      response = [pkts_num,bytes_num]
+      for i,val in enumerate(leaf_agent):
+        url = '10.0.0.'+str(val)+':8000'
+        [leaf_pkt,leaf_byte] = requests.post(url,data=self.args) 
+
+    # unfinished here
+
+    if msg_type == 'config sketch':
+      response = send_to_monitor(self.args)
+    if msg_type == 'query sketch':
+      response = send_to_monitor(self.args)
+    if msg_type == 'query heavy hitters':
+      response = send_to_monitor(self.args)
 
     self.send_response(200)
     self.end_headers()
@@ -111,20 +126,27 @@ class MyHandler(BaseHTTPRequestHandler):
     self.end_headers()
     self.wfile.write("This is SoNIC server")
 
-def run(sid,port):
+def run(addr,port):
   print('http server is starting...')
 
   #ip and port of servr
   #by default http server port is 8000
-  server_address = ('10.0.0.'+str(sid),port)
+  server_address = (addr,port)
+  print server_address
   httpd = HTTPServer(server_address, MyHandler)
-  print('server is listenning on host '+str(sid)+':'+str(port))
+  print('server is listenning on host '+addr+':'+str(port))
   httpd.serve_forever()
-  
+
+# gloabal vriable: for storing the ip of leaf notes
+leaf_agent = []
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='This is SoNIC server')
   parser.add_argument('-p','--port',help='server listen port',default=8000)
-  parser.add_argument('-i','--sid',help='server id', required=True)
+  parser.add_argument('-a','--address',help='server address', required=True)
+  parser.add_argument('-l','--leaf',help='leaf host id',default=[])
   args = parser.parse_args()
   
-  run(int(args.sid),int(args.port))
+  leaf_agent = leaf_agent + re.findall('[0-9]+',str(args.leaf)) 
+  
+  run(args.address,int(args.port))

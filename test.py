@@ -1,37 +1,63 @@
-import requests, subprocess
+import requests, subprocess, argparse
 
-print '[test counter configuration...]'
-url = "http://10.0.0.1:8000"
+parser = argparse.ArgumentParser(description='Tests for network measurement')
+parser.add_argument('-a','--address',help='server address', required=True)
+args = parser.parse_args()
+
+url = 'http://' + args.address + ':8000'
+
+print '\n[test counter configuration...]'
 data = {}
 data['type'] = 'config counter'
 data['interface'] = 'INPUT'
 data['target'] = 'ACCEPT'
 data['proto'] = 'icmp'
-print "sending to" + url + " " + str(data)
+print "sending to " + url + " " + str(data)
 response = requests.post(url, data = data)
 print response.text
 
+print "pinging h2 for 3 times"
 subprocess.call('timeout 3 ping 10.0.0.2', shell=True)
 
-print '[test counter querying...]'
-url = "http://10.0.0.1:8000"
+print '\n[test counter querying...]'
 data = {}
 data['type'] = 'query counter'
 data['proto'] = 'icmp'
+print "sending to " + url + " " + str(data)
+response = requests.post(url, data = data)
+print response.text
+
+print "cleaning iptable rules"
+subprocess.call('iptables -F INPUT', shell=True)
+
+print '\n[test sketch configuration...]'
+data = {}
+data['type'] = 'config sketch'
+data['interface'] = 'INPUT'
+data['proto'] = 'icmp'
+print "sending to " + url + " " + str(data)
+response = requests.post(url, data = data)
+print response.text
+
+print "pinging h2 for 7 times..."
+subprocess.call('timeout 7 ping 10.0.0.2', shell=True)
+
+print '[test sketch query...]'
+data = {}
+data['type'] = 'query sketch'
+data['sketch id'] = '0'
+data['counter key'] = '10.0.0.2'
 print "sending to" + url + " " + str(data)
 response = requests.post(url, data = data)
 print response.text
 
-print '[test sketch configuration...]'
-url = "http://10.0.0.1:8000"
+print '[test heavy hitter query...]'
 data = {}
-data['type'] = 'config sketch'
-data['interface'] = 'INPUT'
-data['target'] = 'ACCEPT'
-data['proto'] = 'icmp'
+data['type'] = 'query heavy hitters'
+data['sketch id'] = '0'
 print "sending to" + url + " " + str(data)
-#response = requests.post(url, data = data)
-#print response.text
+response = requests.post(url, data = data)
+print response.text
 
 print "cleaning iptable rules"
 subprocess.call('iptables -F INPUT', shell=True)
