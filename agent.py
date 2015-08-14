@@ -76,6 +76,20 @@ def send_to_monitor(args):
   response = requests.post(url, data=args)
   return response.text
 
+def recursive_query(args):
+  [pkts_num,bytes_num] = iptables.read_counter(args)
+  for a in leaf_agent:
+    url = 'http://' + a + ':8000'
+    output = requests.post(url, data=args)
+    print 'recursive query: ' + output.text
+    # parse output
+    result = re.findall('[0-9]+',output.text)
+    if len(result) > 1:
+      [leaf_pkt, leaf_byte] = [int(result[0]),int(result[1])]
+      pkts_num = pkts_num + leaf_pkt
+      bytes_num = bytes_num + leaf_byte
+  return [pkts_num,bytes_num]
+
 class MyHandler(BaseHTTPRequestHandler):
   def do_POST(self):
     self.query_string = self.rfile.read(int(self.headers['Content-Length']))  
@@ -97,18 +111,12 @@ class MyHandler(BaseHTTPRequestHandler):
     # handle traffic monitoring messages
     if msg_type == 'config counter':
       for i,val in enumerate(leaf_agent):
-        url = '10.0.0.'+str(val)+':8000'
+        url = 'http://'+str(val)+':8000'
         requests.post(url,data=self.args)
       response = iptables.install_rules(self.args)  
     if msg_type == 'query counter':
-      [pkts_num,bytes_num] = iptables.read_counter(self.args)
-      response = [pkts_num,bytes_num]
-      for i,val in enumerate(leaf_agent):
-        url = '10.0.0.'+str(val)+':8000'
-        [leaf_pkt,leaf_byte] = requests.post(url,data=self.args) 
-
-    # unfinished here
-
+      # recursive querying leaf agents
+      response = recursive_query(self.args)
     if msg_type == 'config sketch':
       response = send_to_monitor(self.args)
     if msg_type == 'query sketch':
@@ -147,6 +155,6 @@ if __name__ == '__main__':
   parser.add_argument('-l','--leaf',help='leaf host id',default=[])
   args = parser.parse_args()
   
-  leaf_agent = leaf_agent + re.findall('[0-9]+',str(args.leaf)) 
+  leaf_agent = leaf_agent + re.findall('[0-9]+.[0-9]+.[0-9]+.[0-9]+',str(args.leaf)) 
   
   run(args.address,int(args.port))

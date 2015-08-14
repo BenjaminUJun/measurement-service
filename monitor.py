@@ -95,6 +95,8 @@ class MyHandler(BaseHTTPRequestHandler):
           key = self.args['counter key']
         else:
           response = 'no counter key specified'
+        print "sketch id: " + str(sketch_id)
+        print "sketch list length: " + str(len(sketch_list))
         response = sketch_list[sketch_id].query_sketch(key)
       if self.args['type'] == 'query heavy hitters':
         if 'sketch id' in self.args:

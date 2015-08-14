@@ -48,7 +48,7 @@ def read_counter(args):
       result_line = result_list.pop() 
       result = re.findall('[0-9]+', result_line)
       if len(result) > 1:
-         [pkt_num, byte_num] = [result[0],result[1]]
+         [pkt_num, byte_num] = [int(result[0]),int(result[1])]
   except subprocess.CalledProcessError as e:
     return e.output
   return [pkt_num, byte_num]

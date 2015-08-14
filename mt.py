@@ -17,21 +17,46 @@ class SingleSwitchTopo(Topo):
 
 # run monitor and agent on each hosts
 def config_hosts(hosts):
+  import time
   work_dir = ' /home/mininet/measurement-service/'
-  for h in hosts:
-    ip = h.IP()  
-    h.cmd('python' + work_dir + 'agent.py -a ' + ip + ' &')
-    h.cmd('python' + work_dir + 'monitor.py' + ' &') 
+  if len(hosts) > 1:
+    # fake one host as controller and send configuration messages to other hosts
+    c = hosts[0]
+    # set host2 as parent node of the rest nodes 
+    l = []
+
+  for i,h in enumerate(hosts):
+    # test on other hosts
+    if i > 0:
+      ip = h.IP()  
+      if i == len(hosts)-1:
+        h.cmd('python' + work_dir + 'agent.py -a ' + ip + ' -l ' + '\''+str(l)+'\''+ ' &')
+        h.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f config_counters' + '&')
+      else:
+        h.cmd('python' + work_dir + 'agent.py -a ' + ip + ' &')
+        l.append(h.IP())
+      #h.cmd('python' + work_dir + 'monitor.py' + ' &') 
+      #time.sleep(0.5)
+      #c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f config_sketch' + '&')
 
 # send messages to do measurements
 def send_msg(hosts):
-  import requests
   work_dir = ' /home/mininet/measurement-service/'
   if len(hosts) > 1:
-    h1 = hosts[0]
-  for h in hosts:
-    ip = h.IP() 
-    print h.cmd('python' + work_dir + 'test.py -a ' + ip)
+    # fake one host as controller and send configuration messages to other hosts
+    c = hosts[0]
+    p = hosts[len(hosts)-1]
+    ip = p.IP() 
+    print c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f query_counters' + '&')
+#    print c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f query_sketch' + '&')
+#    print c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f query_heavy_hitters' + '&')
+
+def clear_counters(hosts):
+  work_dir = ' /home/mininet/measurement-service/'
+  for i,h in enumerate(hosts):
+    if i > 0: 
+      ip = h.IP() 
+      h.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f clear_counters' + '&')
 
 def simpleTest():
   "Create and test a simple network"
@@ -44,8 +69,11 @@ def simpleTest():
   net.pingAll()
   print "Testing measurement service"
   config_hosts(net.hosts)
+  CLI(net)
+  net.pingAll()
   send_msg(net.hosts)
   CLI(net)
+  clear_counters(net.hosts)
   net.stop()
 
 if __name__ == '__main__':
