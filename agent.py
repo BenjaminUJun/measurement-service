@@ -81,7 +81,6 @@ def recursive_query(args):
   for a in leaf_agent:
     url = 'http://' + a + ':8000'
     output = requests.post(url, data=args)
-    print 'recursive query: ' + output.text
     # parse output
     result = re.findall('[0-9]+',output.text)
     if len(result) > 1:
@@ -89,6 +88,26 @@ def recursive_query(args):
       pkts_num = pkts_num + leaf_pkt
       bytes_num = bytes_num + leaf_byte
   return [pkts_num,bytes_num]
+
+def recursive_query_sketch(args):
+  count = int(send_to_monitor(args))
+  for addr in leaf_agent:
+    url = 'http://' + addr + ':8000'
+    output = requests.post(url,data=args)
+    leaf_count = int(output.text)
+    count = count + leaf_count
+  return count
+    
+def recursive_query_heavy_hitter(args):
+  from collections import Counter
+  import ast 
+  h_hitter = ast.literal_eval(send_to_monitor(args))
+  for addr in leaf_agent:
+    url = 'http://' + addr + ':8000' 
+    output = requests.post(url,data=args)
+    leaf_hitter = ast.literal_eval(output.text)
+    h_hitter = Counter(h_hitter) + Counter(leaf_hitter)
+  return dict(h_hitter)
 
 class MyHandler(BaseHTTPRequestHandler):
   def do_POST(self):
@@ -110,19 +129,24 @@ class MyHandler(BaseHTTPRequestHandler):
       response = receive_probe(self.args)
     # handle traffic monitoring messages
     if msg_type == 'config counter':
-      for i,val in enumerate(leaf_agent):
-        url = 'http://'+str(val)+':8000'
+      # send out configuration message to leaf agents
+      for i,addr in enumerate(leaf_agent):
+        url = 'http://'+str(addr)+':8000'
         requests.post(url,data=self.args)
       response = iptables.install_rules(self.args)  
     if msg_type == 'query counter':
       # recursive querying leaf agents
       response = recursive_query(self.args)
     if msg_type == 'config sketch':
+      # send out configuration message to leaf agents
+      for i,addr in enumerate(leaf_agent):
+        url = 'http://' + str(addr) + ':8000'
+        requests.post(url,data=self.args)
       response = send_to_monitor(self.args)
     if msg_type == 'query sketch':
-      response = send_to_monitor(self.args)
+      response = recursive_query_sketch(self.args)
     if msg_type == 'query heavy hitters':
-      response = send_to_monitor(self.args)
+      response = recursive_query_heavy_hitter(self.args)
 
     self.send_response(200)
     self.end_headers()

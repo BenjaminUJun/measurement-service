@@ -22,22 +22,21 @@ def config_hosts(hosts):
   if len(hosts) > 1:
     # fake one host as controller and send configuration messages to other hosts
     c = hosts[0]
-    # set host2 as parent node of the rest nodes 
-    l = []
+    p = hosts[1]
+    leaf = hosts[2:len(hosts)] 
+    leaf_addrs = [h.IP() for h in leaf]
+    
+    p.cmd('python' + work_dir + 'agent.py -a ' + p.IP() + ' -l ' + '\''+str(leaf_addrs)+'\''+ ' &')
+    p.cmd('python' + work_dir + 'monitor.py' + ' &') 
 
-  for i,h in enumerate(hosts):
-    # test on other hosts
-    if i > 0:
-      ip = h.IP()  
-      if i == len(hosts)-1:
-        h.cmd('python' + work_dir + 'agent.py -a ' + ip + ' -l ' + '\''+str(l)+'\''+ ' &')
-        h.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f config_counters' + '&')
-      else:
-        h.cmd('python' + work_dir + 'agent.py -a ' + ip + ' &')
-        l.append(h.IP())
-      #h.cmd('python' + work_dir + 'monitor.py' + ' &') 
-      #time.sleep(0.5)
-      #c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f config_sketch' + '&')
+    for h in leaf:
+      h.cmd('python' + work_dir + 'agent.py -a ' + h.IP() + ' &')
+      h.cmd('python' + work_dir + 'monitor.py' + ' &') 
+    
+    # configure counters and sketches on hosts
+    time.sleep(0.5)
+    c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + p.IP() + ' -f config_counters') 
+#    c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + p.IP() + ' -f config_sketch') 
 
 # send messages to do measurements
 def send_msg(hosts):
@@ -45,11 +44,11 @@ def send_msg(hosts):
   if len(hosts) > 1:
     # fake one host as controller and send configuration messages to other hosts
     c = hosts[0]
-    p = hosts[len(hosts)-1]
+    p = hosts[1]
     ip = p.IP() 
-    print c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f query_counters' + '&')
-#    print c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f query_sketch' + '&')
-#    print c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f query_heavy_hitters' + '&')
+    print 'query counters: ' + c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + p.IP() + ' -f query_counters')
+#    print 'query sketch: ' + c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + p.IP() + ' -f query_sketch') 
+#    print 'query heavy hitter: ' + c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + p.IP() + ' -f query_heavy_hitters' )
 
 def clear_counters(hosts):
   work_dir = ' /home/mininet/measurement-service/'
