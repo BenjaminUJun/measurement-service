@@ -17,12 +17,20 @@ class MyHandler(BaseHTTPRequestHandler):
       self.wfile.write("No message type indicated.")
       return
 
-    if(msg_type=='bw_update'):
+    if msg_type == 'config sketch':
+      addr = self.args['address']
+      url = 'http://' + addr  + ':8000' 
+      output = requests.post(url,data=self.args)
+      response = output.text
+
+    if msg_type == 'bw_update':
       print self.args
+      response = "Update acknowledged."
+      return
+
       self.send_response(200)
       self.end_headers()
-      self.wfile.write("Update acknowledged.")
-      return
+      self.wfile.write(response)
 
   def do_GET(self):
 # check if server is running

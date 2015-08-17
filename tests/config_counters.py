@@ -7,6 +7,7 @@ def config_counters(url):
   data['interface'] = 'INPUT'
   data['target'] = 'ACCEPT'
   data['proto'] = 'icmp'
+  data['src'] = '10.0.0.2'
   print "sending to " + url + ": " + str(data)
   response = requests.post(url, data = data)
   print response.text
@@ -16,6 +17,7 @@ def query_counters(url):
   data = {}
   data['type'] = 'query counter'
   data['proto'] = 'icmp'
+  data['src'] = '10.0.0.2'
   print "sending to " + url + " " + str(data)
   response = requests.post(url, data = data)
   print response.text
@@ -34,8 +36,8 @@ def query_sketch(url):
   print '\n[test sketch query...]'
   data = {}
   data['type'] = 'query sketch'
-  data['sketch id'] = '0'
-  data['counter key'] = '10.0.0.2'
+  data['sketch_id'] = 0
+  data['counter_key'] = '10.0.0.2'
   print "sending to" + url + " " + str(data)
   response = requests.post(url, data = data)
   print response.text
@@ -44,7 +46,7 @@ def query_heavy_hitters(url):
   print '\n[test heavy hitter query...]'
   data = {}
   data['type'] = 'query heavy hitters'
-  data['sketch id'] = '0'
+  data['sketch_id'] = '0'
   print "sending to" + url + " " + str(data)
   response = requests.post(url, data = data)
   print response.text
@@ -68,7 +70,7 @@ def run_test(addr, funct):
   if funct == 'query_heavy_hitters':
     query_heavy_hitters(url)
   if funct == 'clear_counters':
-    clear_counters()
+    clear_counters(url)
 
 if __name__ == '__main__':
   import argparse

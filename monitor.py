@@ -19,7 +19,15 @@ def add_sketch(args):
   global sketch_list
   # allocate an id to a new sketch
   sketch_id = len(sketch_list)
-  sketch = SketchCounter()
+  if 'counter_key_type' in args:
+    key_type = args['counter_key_type']
+  else:
+    key_type = 'src'
+  if 'increment' in args:
+    increment = args['increment']
+  else:
+    increment = 'pkt'
+  sketch = SketchCounter(key_type,increment)
   # add the new sketch to the global sketch list
   sketch_list.append(sketch)
   # install a rule to iptable, which sends targeted packets to nf queue
@@ -42,32 +50,45 @@ def add_sketch(args):
   return sketch_id
 
 class SketchCounter():
-  def __init__(self):
+  def __init__(self,key_type='src',increment='pkt'):
     self.sketch = madoka.Sketch()
     self.total_counter = 0
     self.heavy_hitter = {}
     self.threshold = 0.1
     self.pkt_threshold = 5
 
+    self.key_type = key_type
+    self.increment = increment
+
   def count(self,pkt):
     pkt.accept()
-    print pkt
     payload = IP(pkt.get_payload())		
-    src = str(payload.getlayer(IP).src)
-    self.sketch[src] += 1
-    self.total_counter += 1
-    print 'total number:'+ str(self.total_counter)
-    self.detect_heavy_hitter(src)
+    # extract counter key from packet
+    if self.key_type == 'src_dst':
+      # get the byte length of packet
+      src = payload.getlayer(IP).src
+      dst = payload.getlayer(IP).dst
+      key = str(src) + ',' + str(dst)
+    else:
+      key = str(payload.getlayer(IP).src)
+    # count increment    
+    if self.increment == 'byte':
+      byte_len = payload.getlayer(IP).len
+      self.sketch[key] += byte_len
+      self.total_counter += byte_len
+    else:
+      self.sketch[key] += 1
+      self.total_counter += 1
+    # do heavy hitter detection
+    self.detect_heavy_hitter(key)
 
-  def detect_heavy_hitter(self, src):
+  def detect_heavy_hitter(self, key):
     if self.total_counter > self.pkt_threshold:
-      if float(self.sketch[src])/float(self.total_counter) > self.threshold:
-        self.heavy_hitter[src] = self.sketch[src]
-        print "heavy hitter detected: %d hits" % self.sketch[src]
-        print "src: "+ str(src) 
+      if float(self.sketch[key])/float(self.total_counter) > self.threshold:
+        self.heavy_hitter[key] = self.sketch[key]
       else:
-        if src in self.heavy_hitter:
-          del self.heavy_hitter[src]
+        if key in self.heavy_hitter:
+          del self.heavy_hitter[key]
 
   def get_sum(self):
     return self.total_counter 
@@ -83,29 +104,27 @@ class MyHandler(BaseHTTPRequestHandler):
     self.query_string = self.rfile.read(int(self.headers['Content-Length']))  
     self.args = dict(cgi.parse_qsl(self.query_string))
     response = "NULL"
+    status_code = 200
     if 'type' in self.args:
       if self.args['type'] == 'config sketch':
         response = add_sketch(self.args)
       if self.args['type'] == 'query sketch':
-        if 'sketch id' in self.args:
-          sketch_id = int(self.args['sketch id'])
+        if ('sketch_id' in self.args) & ('counter_key' in self.args) :
+          sketch_id = int(self.args['sketch_id'])
+          key = self.args['counter_key']
+          response = sketch_list[sketch_id].query_sketch(key)
         else:
-          response = 'no sketch id specified'
-        if 'counter key' in self.args:
-          key = self.args['counter key']
-        else:
-          response = 'no counter key specified'
-        print "sketch id: " + str(sketch_id)
-        print "sketch list length: " + str(len(sketch_list))
-        response = sketch_list[sketch_id].query_sketch(key)
+          status_code = 400
+          response = 'argument missing: sketch id or counter key'
       if self.args['type'] == 'query heavy hitters':
-        if 'sketch id' in self.args:
-          sketch_id = int(self.args['sketch id'])
+        if 'sketch_id' in self.args:
+          sketch_id = int(self.args['sketch_id'])
           response = str(sketch_list[sketch_id].get_heavy_hitter()) 
         else:
+          status_code = 400
           response = 'no sketch id specified'
      
-    self.send_response(200)
+    self.send_response(status_code)
     self.end_headers()
     self.wfile.write(str(response))
     return

@@ -74,50 +74,86 @@ def send_to_monitor(args):
   port = 9000
   url = 'http://127.0.0.1:' + str(port) 
   response = requests.post(url, data=args)
-  return response.text
+  return response
 
 def recursive_query(args):
   [pkts_num,bytes_num] = iptables.read_counter(args)
+  response = {}
   for a in leaf_agent:
     url = 'http://' + a + ':8000'
-    output = requests.post(url, data=args)
-    # parse output
-    result = re.findall('[0-9]+',output.text)
-    if len(result) > 1:
-      [leaf_pkt, leaf_byte] = [int(result[0]),int(result[1])]
-      pkts_num = pkts_num + leaf_pkt
-      bytes_num = bytes_num + leaf_byte
-  return [pkts_num,bytes_num]
+    r = requests.post(url, data=args)
+    if r.status_code == 200:
+      # parse output
+      result = re.findall('[0-9]+',r.text)
+      if len(result) > 1:
+        [leaf_pkt, leaf_byte] = [int(result[0]),int(result[1])]
+        pkts_num = pkts_num + leaf_pkt
+        bytes_num = bytes_num + leaf_byte
+    else:
+      response['status_code'] = r.status_code
+      response['data'] = r.text
+  response['status_code'] = 200
+  response['data'] = [pkts_num,bytes_num]
+  return response
 
 def recursive_query_sketch(args):
-  count = int(send_to_monitor(args))
+  r = send_to_monitor(args)
+  response = {}
+  if r.status_code == 200:
+    count = int(r.text)
+  else:
+    response['status_code'] = r.status_code
+    response['data'] = r.text
+    return response
+
   for addr in leaf_agent:
     url = 'http://' + addr + ':8000'
-    output = requests.post(url,data=args)
-    leaf_count = int(output.text)
-    count = count + leaf_count
-  return count
+    r = requests.post(url,data=args)
+    if r.status_code == 200:
+      leaf_count = int(r.text)
+      count = count + leaf_count
+    else:
+      response['status_code'] = r.status_code
+      response['data'] = r.text
+      return response
+      
+  response['status_code'] = 200
+  response['data'] = count
+  return response
     
 def recursive_query_heavy_hitter(args):
   from collections import Counter
   import ast 
-  h_hitter = ast.literal_eval(send_to_monitor(args))
+  response = {'status_code':200,'data':{}}
+  r = send_to_monitor(args)
+  if r.status_code == 200:
+    h_hitter = ast.literal_eval(r.text)
+  else:
+    response['status_code'] = r.status_code
+    response['data'] = r.text
+    return response
+
   for addr in leaf_agent:
     url = 'http://' + addr + ':8000' 
-    output = requests.post(url,data=args)
-    leaf_hitter = ast.literal_eval(output.text)
-    h_hitter = Counter(h_hitter) + Counter(leaf_hitter)
-  return dict(h_hitter)
+    r = requests.post(url,data=args)
+    if r.status_code == 200:
+      leaf_hitter = ast.literal_eval(r.text)
+      h_hitter = Counter(h_hitter) + Counter(leaf_hitter)
+    else:
+      response['status_code'] = 500
+  response['data'] = dict(h_hitter)
+  return response
 
 class MyHandler(BaseHTTPRequestHandler):
   def do_POST(self):
     self.query_string = self.rfile.read(int(self.headers['Content-Length']))  
     self.args = dict(cgi.parse_qsl(self.query_string))
-    response = "NULL"
+    status_code = 200
+    response = ''
     if 'type' in self.args:
       msg_type = self.args['type']
     else:
-      self.send_response(200)
+      self.send_response(400)
       self.end_headers()
       self.wfile.write("No message type indicated.")
       return
@@ -136,19 +172,27 @@ class MyHandler(BaseHTTPRequestHandler):
       response = iptables.install_rules(self.args)  
     if msg_type == 'query counter':
       # recursive querying leaf agents
-      response = recursive_query(self.args)
+      r = recursive_query(self.args)
+      status_code = r['status_code']
+      response = r['data']
     if msg_type == 'config sketch':
       # send out configuration message to leaf agents
       for i,addr in enumerate(leaf_agent):
         url = 'http://' + str(addr) + ':8000'
         requests.post(url,data=self.args)
-      response = send_to_monitor(self.args)
+      r = send_to_monitor(self.args)
+      status_code = r.status_code
+      response = r.text
     if msg_type == 'query sketch':
-      response = recursive_query_sketch(self.args)
+      r= recursive_query_sketch(self.args)
+      status_code = r['status_code']
+      response = r['data']
     if msg_type == 'query heavy hitters':
-      response = recursive_query_heavy_hitter(self.args)
+      r = recursive_query_heavy_hitter(self.args)
+      status_code = r['status_code']
+      response = r['data']
 
-    self.send_response(200)
+    self.send_response(status_code)
     self.end_headers()
     self.wfile.write(str(response))
     return
