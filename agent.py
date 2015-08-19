@@ -98,8 +98,10 @@ def recursive_query(args):
 
 def recursive_query_sketch(args):
   r = send_to_monitor(args)
+  print args
   response = {}
   if r.status_code == 200:
+    print r.text
     count = int(r.text)
   else:
     response['status_code'] = r.status_code
@@ -125,9 +127,12 @@ def recursive_query_heavy_hitter(args):
   from collections import Counter
   import ast 
   response = {'status_code':200,'data':{}}
+  h_hitter = {}
   r = send_to_monitor(args)
   if r.status_code == 200:
+    print r.text
     h_hitter = ast.literal_eval(r.text)
+    print type(h_hitter)
   else:
     response['status_code'] = r.status_code
     response['data'] = r.text
@@ -141,6 +146,7 @@ def recursive_query_heavy_hitter(args):
       h_hitter = Counter(h_hitter) + Counter(leaf_hitter)
     else:
       response['status_code'] = 500
+
   response['data'] = dict(h_hitter)
   return response
 
@@ -149,7 +155,7 @@ class MyHandler(BaseHTTPRequestHandler):
     self.query_string = self.rfile.read(int(self.headers['Content-Length']))  
     self.args = dict(cgi.parse_qsl(self.query_string))
     status_code = 200
-    response = ''
+    response = "error: message not parsed"
     if 'type' in self.args:
       msg_type = self.args['type']
     else:
@@ -183,6 +189,16 @@ class MyHandler(BaseHTTPRequestHandler):
       r = send_to_monitor(self.args)
       status_code = r.status_code
       response = r.text
+    if msg_type == 'config sketch counter':
+      # send out configuration message to leaf agents
+      for i,addr in enumerate(leaf_agent):
+        # to config global counters on distributed end-hosts, may need to look up sketch id on each end-host, although in experiments they are the same
+        url = 'http://' + str(addr) + ':8000'
+        requests.post(url,data=self.args)
+      r = send_to_monitor(self.args)
+      status_code = r.status_code
+      response = r.text
+      
     if msg_type == 'query sketch':
       r= recursive_query_sketch(self.args)
       status_code = r['status_code']

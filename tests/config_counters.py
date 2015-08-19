@@ -32,11 +32,22 @@ def config_sketch(url):
   response = requests.post(url, data = data)
   print response.text
 
+def add_sketch_counter(url):
+  print '\n[adding counter to sketch 0]'
+  data={}
+  data['type'] = 'config sketch counter'
+  data['sketch_id'] = 0
+  data['counter_key_type'] = 'src'
+  print "sending to " + url + " " + str(data)
+  response = requests.post(url, data = data)
+  print response.text
+
 def query_sketch(url):
   print '\n[test sketch query...]'
   data = {}
   data['type'] = 'query sketch'
   data['sketch_id'] = 0
+  data['counter_key_type'] = 'src'
   data['counter_key'] = '10.0.0.2'
   print "sending to" + url + " " + str(data)
   response = requests.post(url, data = data)
@@ -47,6 +58,7 @@ def query_heavy_hitters(url):
   data = {}
   data['type'] = 'query heavy hitters'
   data['sketch_id'] = '0'
+  data['counter_key_type'] = 'src'
   print "sending to" + url + " " + str(data)
   response = requests.post(url, data = data)
   print response.text
@@ -64,7 +76,10 @@ def run_test(addr, funct):
   if funct == 'query_counters':
     query_counters(url)
   if funct == 'config_sketch':
+    print 'controller adding sketch'
     config_sketch(url)
+    print 'controller adding counter to sketch'
+    add_sketch_counter(url)
   if funct == 'query_sketch':
     query_sketch(url)
   if funct == 'query_heavy_hitters':

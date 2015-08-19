@@ -44,7 +44,7 @@ def config_hosts(hosts):
     leaf_addrs = [h.IP() for h in leaf]
     
     p.cmd('python' + work_dir + 'agent.py -a ' + p.IP() + ' -l ' + '\''+str(leaf_addrs)+'\''+ ' &')
-    p.cmd('python' + work_dir + 'monitor.py' + ' &') 
+    p.cmd('python' + work_dir + 'monitor.py' + '&') 
 
     for h in leaf:
       h.cmd('python' + work_dir + 'agent.py -a ' + h.IP() + ' &')
@@ -87,10 +87,8 @@ def simpleTest():
   net.pingAll()
   print "Testing measurement service"
   config_hosts(net.hosts)
-  CLI(net)
   net.pingAll()
   send_msg(net.hosts)
-  CLI(net)
   clear_counters(net.hosts)
   CLI(net)
   net.stop()

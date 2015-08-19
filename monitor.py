@@ -19,20 +19,12 @@ def add_sketch(args):
   global sketch_list
   # allocate an id to a new sketch
   sketch_id = len(sketch_list)
-  if 'counter_key_type' in args:
-    key_type = args['counter_key_type']
-  else:
-    key_type = 'src'
-  if 'increment' in args:
-    increment = args['increment']
-  else:
-    increment = 'pkt'
-  sketch = SketchCounter(key_type,increment)
+  s = Sketch()
   # add the new sketch to the global sketch list
-  sketch_list.append(sketch)
+  sketch_list.append(s)
   # install a rule to iptable, which sends targeted packets to nf queue
   construct_msg = {}
-  construct_msg['interface'] = 'INPUT' 
+  construct_msg['interface'] = args['interface']
   construct_msg['target'] = 'NFQUEUE'
   construct_msg['queue number'] = str(sketch_id)
   if 'proto' in args:
@@ -45,32 +37,96 @@ def add_sketch(args):
   # bind the queue number with the sketch 
   nfqueue = NetfilterQueue()
   queue_num = sketch_id
-  nfqueue.bind(queue_num, sketch_list[sketch_id].count)
+  nfqueue.bind(queue_num, sketch_list[sketch_id].iterate_counters)
   thread.start_new_thread(nfqueue.run,())
   return sketch_id
 
+def add_sketch_counter(args):
+  global sketch_list
+  response = {'status_code':200,'data':''}
+  if 'counter_key_type' in args:
+    key_type = args['counter_key_type']
+  else:
+    response['status_code'] = 400
+    response['data'] = "bad request: request missing type of counter key"
+    return response
+
+  if 'increment' in args:
+    increment = args['increment']
+  else:
+    increment = 'pkt'
+  if 'hitter_threshold' in args:
+    hitter_threshold = args['hitter_threshold']
+  else:
+    hitter_threshold = 0.1
+
+  if 'sketch_id' in args:
+    sketch_id = int(args['sketch_id'])
+    c = SketchCounter(key_type,increment,hitter_threshold)
+    sketch_list[sketch_id].add_counter(c)
+    response['data'] = "counter added: " + key_type,increment + str(hitter_threshold)
+  else:
+    response['status_code'] = 400
+    response['data'] = "bad request: request missing sketch id"
+
+  print len(sketch_list[sketch_id].counter_list)
+  return response  
+
+class Sketch():
+  def __init__(self):
+    self.counter_list = []
+  
+  def add_counter(self,c):
+    self.counter_list.append(c)
+  
+  def iterate_counters(self,pkt):
+    pkt.accept()
+    for c in self.counter_list:
+      c.count(pkt)
+ 
+  def query_counter(self,key_type,key):
+    print 'counter list length: ' + str(len(self.counter_list))
+    for c in self.counter_list:
+      if c.key_type == key_type:
+        return c.query_sketch(key)
+  
+  def get_heavy_hitter(self,key_type):
+     for c in self.counter_list:
+      if c.key_type == key_type:
+        return c.get_heavy_hitter()
+
 class SketchCounter():
-  def __init__(self,key_type='src',increment='pkt'):
+  def __init__(self,key_type='src',increment='pkt',hitter_threshold=0.1):
     self.sketch = madoka.Sketch()
     self.total_counter = 0
     self.heavy_hitter = {}
-    self.threshold = 0.1
+    self.threshold = hitter_threshold
     self.pkt_threshold = 5
 
     self.key_type = key_type
     self.increment = increment
 
   def count(self,pkt):
-    pkt.accept()
     payload = IP(pkt.get_payload())		
+    src = payload.getlayer(IP).src
+    dst = payload.getlayer(IP).dst
+    if (src == '127.0.0.1') | (dst=='127.0.0.1'):
+      # skip the local traffic
+      return
     # extract counter key from packet
     if self.key_type == 'src_dst':
       # get the byte length of packet
-      src = payload.getlayer(IP).src
-      dst = payload.getlayer(IP).dst
       key = str(src) + ',' + str(dst)
+    elif self.key_type == 'dst':
+      key = str(dst)
+    elif self.key_type == 'dport':
+      if hasattr(payload.getlayer(IP),'dport'):
+        key = str(payload.getlayer(IP).dport)
+      else:
+        return
     else:
-      key = str(payload.getlayer(IP).src)
+      # collect src addr distribution by default
+      key = str(src)
     # count increment    
     if self.increment == 'byte':
       byte_len = payload.getlayer(IP).len
@@ -103,26 +159,34 @@ class MyHandler(BaseHTTPRequestHandler):
   def do_POST(self):
     self.query_string = self.rfile.read(int(self.headers['Content-Length']))  
     self.args = dict(cgi.parse_qsl(self.query_string))
-    response = "NULL"
-    status_code = 200
+    response = "error: message not parsed"
+    status_code = 400 
     if 'type' in self.args:
       if self.args['type'] == 'config sketch':
+        statuu_code = 200
         response = add_sketch(self.args)
+      if self.args['type'] == 'config sketch counter':
+        status_code = 200
+        response = add_sketch_counter(self.args)
       if self.args['type'] == 'query sketch':
-        if ('sketch_id' in self.args) & ('counter_key' in self.args) :
+        if ('sketch_id' in self.args) & ('counter_key_type' in self.args) & ('counter_key' in self.args) :
           sketch_id = int(self.args['sketch_id'])
+          key_type = self.args['counter_key_type']
           key = self.args['counter_key']
-          response = sketch_list[sketch_id].query_sketch(key)
+          response = sketch_list[sketch_id].query_counter(key_type,key)
+          status_code = 200
         else:
           status_code = 400
           response = 'argument missing: sketch id or counter key'
       if self.args['type'] == 'query heavy hitters':
-        if 'sketch_id' in self.args:
+        if ('sketch_id' in self.args) & ('counter_key_type' in self.args):
           sketch_id = int(self.args['sketch_id'])
-          response = str(sketch_list[sketch_id].get_heavy_hitter()) 
+          key_type = self.args['counter_key_type']
+          status_code = 200
+          response = str(sketch_list[sketch_id].get_heavy_hitter(key_type)) 
         else:
           status_code = 400
-          response = 'no sketch id specified'
+          response = 'sketch id or type of counter key is missing'
      
     self.send_response(status_code)
     self.end_headers()
