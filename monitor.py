@@ -85,15 +85,20 @@ class Sketch():
       c.count(pkt)
  
   def query_counter(self,key_type,key):
-    print 'counter list length: ' + str(len(self.counter_list))
+    response={'status_code':400,'data':"error: key not found"}
     for c in self.counter_list:
       if c.key_type == key_type:
-        return c.query_sketch(key)
+        response['data'] = c.query_sketch(key)
+        response['status_code'] = 200
+    return response
   
   def get_heavy_hitter(self,key_type):
-     for c in self.counter_list:
+    response={'status_code':400,'data':"error: key not found"}
+    for c in self.counter_list:
       if c.key_type == key_type:
-        return c.get_heavy_hitter()
+        response['data'] = c.get_heavy_hitter()
+        response['status_code'] = 200
+    return response
 
 class SketchCounter():
   def __init__(self,key_type='src',increment='pkt',hitter_threshold=0.1):
@@ -173,8 +178,10 @@ class MyHandler(BaseHTTPRequestHandler):
           sketch_id = int(self.args['sketch_id'])
           key_type = self.args['counter_key_type']
           key = self.args['counter_key']
-          response = sketch_list[sketch_id].query_counter(key_type,key)
-          status_code = 200
+          if sketch_id < len(sketch_list):
+            r = sketch_list[sketch_id].query_counter(key_type,key)
+            status_code = r['status_code']
+            response = r['data']
         else:
           status_code = 400
           response = 'argument missing: sketch id or counter key'
@@ -182,8 +189,10 @@ class MyHandler(BaseHTTPRequestHandler):
         if ('sketch_id' in self.args) & ('counter_key_type' in self.args):
           sketch_id = int(self.args['sketch_id'])
           key_type = self.args['counter_key_type']
-          status_code = 200
-          response = str(sketch_list[sketch_id].get_heavy_hitter(key_type)) 
+          if sketch_id < len(sketch_list):
+            r = sketch_list[sketch_id].get_heavy_hitter(key_type)
+            status_code = r['status_code']
+            response = r['data']
         else:
           status_code = 400
           response = 'sketch id or type of counter key is missing'

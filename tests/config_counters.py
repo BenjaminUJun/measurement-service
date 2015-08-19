@@ -61,7 +61,10 @@ def query_heavy_hitters(url):
   data['counter_key_type'] = 'src'
   print "sending to" + url + " " + str(data)
   response = requests.post(url, data = data)
-  print response.text
+  if response.status_code == 200:
+    import json,ast
+    d = ast.literal_eval(response.text)
+    print json.dumps(d,sort_keys=True, indent=4)
 
 def clear_counters(url):
   import subprocess

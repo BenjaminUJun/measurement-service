@@ -7,6 +7,8 @@ from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel
 from mininet.cli import CLI
 
+import pprint
+
 class CircleSwitchTopo(Topo):
   "switches connected into circle."
   def build(self, n=3, m=3):
@@ -36,16 +38,30 @@ class SingleSwitchTopo(Topo):
 def config_hosts(hosts):
   import time
   work_dir = ' /home/mininet/measurement-service/'
-  if len(hosts) > 1:
+  n = len(hosts)
+  if n > 3:
     # fake one host as controller and send configuration messages to other hosts
     c = hosts[0]
     p = hosts[1]
-    leaf = hosts[2:len(hosts)] 
+    leaf = hosts[2:4] 
     leaf_addrs = [h.IP() for h in leaf]
     
     p.cmd('python' + work_dir + 'agent.py -a ' + p.IP() + ' -l ' + '\''+str(leaf_addrs)+'\''+ ' &')
     p.cmd('python' + work_dir + 'monitor.py' + '&') 
 
+    if n > 5:
+      p1 = hosts[2]
+      leaf = hosts[4:2+n/2] 
+      leaf_addrs = [h.IP() for h in leaf]
+      p1.cmd('python' + work_dir + 'agent.py -a ' + p1.IP() + ' -l ' + '\''+str(leaf_addrs)+'\''+ ' &')
+      p1.cmd('python' + work_dir + 'monitor.py' + '&') 
+      p1 = hosts[3]
+      leaf = hosts[2+n/2:n] 
+      leaf_addrs = [h.IP() for h in leaf]
+      p1.cmd('python' + work_dir + 'agent.py -a ' + p1.IP() + ' -l ' + '\''+str(leaf_addrs)+'\''+ ' &')
+      p1.cmd('python' + work_dir + 'monitor.py' + '&') 
+
+    leaf=hosts[4:n]
     for h in leaf:
       h.cmd('python' + work_dir + 'agent.py -a ' + h.IP() + ' &')
       h.cmd('python' + work_dir + 'monitor.py' + ' &') 
@@ -65,7 +81,8 @@ def send_msg(hosts):
     ip = p.IP() 
     print 'query counters: ' + c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + p.IP() + ' -f query_counters')
     print 'query sketch: ' + c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + p.IP() + ' -f query_sketch') 
-    print 'query heavy hitter: ' + c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + p.IP() + ' -f query_heavy_hitters' )
+    print 'query heavy hitter: ' 
+    print c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + p.IP() + ' -f query_heavy_hitters' )
 
 def clear_counters(hosts):
   work_dir = ' /home/mininet/measurement-service/'
@@ -74,10 +91,10 @@ def clear_counters(hosts):
       ip = h.IP() 
       h.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f clear_counters' + '&')
 
-def simpleTest():
+def simpleTest(depth,fanout):
   "Create and test a simple network"
 #  topo = SingleSwitchTopo(n=6)
-  topo = TreeTopo(depth=2,fanout=3)
+  topo = TreeTopo(depth=depth,fanout=fanout)
   net = Mininet(topo)
   net.start()
   print "Dumping host connections"
@@ -87,13 +104,20 @@ def simpleTest():
   net.pingAll()
   print "Testing measurement service"
   config_hosts(net.hosts)
+  CLI(net)
   net.pingAll()
   send_msg(net.hosts)
+  CLI(net)
   clear_counters(net.hosts)
   CLI(net)
   net.stop()
 
 if __name__ == '__main__':
+  import argparse
+  parser = argparse.ArgumentParser(description='This is SoNIC server')
+  parser.add_argument('-f','--fanout',help='fanout of tree topology',default=2)
+  parser.add_argument('-d','--depth',help='depth of tree topology',default=2)
+  args = parser.parse_args()
   # Tell mininet to print useful information
   setLogLevel('info')
-  simpleTest()
+  simpleTest(int(args.depth),int(args.fanout))

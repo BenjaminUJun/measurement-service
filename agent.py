@@ -130,9 +130,7 @@ def recursive_query_heavy_hitter(args):
   h_hitter = {}
   r = send_to_monitor(args)
   if r.status_code == 200:
-    print r.text
     h_hitter = ast.literal_eval(r.text)
-    print type(h_hitter)
   else:
     response['status_code'] = r.status_code
     response['data'] = r.text

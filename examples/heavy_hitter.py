@@ -3,9 +3,20 @@ def config_sketch(addr):
   data = {}
   data['type'] = 'config sketch'
   data['interface'] = 'INPUT'
-  data['queue num'] = 1
-  data['counter key type'] = 'src addr'
+  data['counter_key_type'] = 'src'
   data['dst'] = addr
+
+  url = 'http://' + addr + ':8000'
+  response = requests.post(url,data=data)
+
+  return response.text
+
+def config_sketch_counter(addr,sketch_id):
+  import requests
+  data = {}
+  data['type'] = 'config sketch counter'
+  data['sketch_id'] = sketch_id
+  data['counter_key_type'] = 'src'
 
   url = 'http://' + addr + ':8000'
   response = requests.post(url,data=data)
@@ -16,20 +27,26 @@ def query_heavy_hitter(addr,sketch_id):
   import requests
   data = {}
   data['type'] = 'query heavy hitters'
-  data['sketch id'] = sketch_id
+  data['sketch_id'] = sketch_id
+  data['counter_key_type'] = 'src'
 
   url = 'http://' + addr + ':8000'
   response = requests.post(url,data=data)
 
-  return response.text
+  return response
 
 def run(addr,funct,sketch_id):
   if funct == 'config_sketch':
-    sketch_id = config_sketch(addr)
-    print 'sketch id: ' + str(sketch_id)
+    i = config_sketch(addr)
+    print 'sketch id: ' + str(i)
+    config_sketch_counter(addr,i)
   if funct == 'query_heavy_hitter':
     if sketch_id >= 0:
-      print query_heavy_hitter(addr,sketch_id)
+      output = query_heavy_hitter(addr,sketch_id)
+      if output.status_code == 200:
+        import json,ast
+        d = ast.literal_eval(output.text)
+        print json.dumps(d,sort_keys=True,indent=4)
 
 if __name__ == '__main__':
   import argparse

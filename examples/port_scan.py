@@ -32,7 +32,7 @@ def query_heavy_hitter(addr,sketch_id,key_type):
   url = 'http://' + addr + ':8000'
   response = requests.post(url,data=data)
 
-  return response.text
+  return response
 
 def run(addr,funct,sketch_id,key_type):
   if funct == 'config_sketch':
@@ -43,7 +43,11 @@ def run(addr,funct,sketch_id,key_type):
     add_sketch_counter(addr,i,'dst') 
   if funct == 'query_heavy_hitter':
     if sketch_id >= 0:
-      print query_heavy_hitter(addr,sketch_id,key_type)
+      r = query_heavy_hitter(addr,sketch_id,key_type)
+      if r.status_code == 200:
+        import json,ast
+        d = ast.literal_eval(r.text)
+        print json.dumps(d,sort_keys=True,indent=4)
 
 if __name__ == '__main__':
   import argparse
