@@ -2,7 +2,7 @@
  
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 import cgi, subprocess, requests, thread, argparse, time, re
-import iptables
+import iptables, iperf
 
 def send_probe():
   snd_cmd = ["/home/haoxian/pathload_1.3.2/pathload_snd"]
@@ -152,7 +152,7 @@ class MyHandler(BaseHTTPRequestHandler):
   def do_POST(self):
     self.query_string = self.rfile.read(int(self.headers['Content-Length']))  
     self.args = dict(cgi.parse_qsl(self.query_string))
-    status_code = 200
+    status_code = 400
     response = "error: message not parsed"
     if 'type' in self.args:
       msg_type = self.args['type']
@@ -167,6 +167,18 @@ class MyHandler(BaseHTTPRequestHandler):
       response = "Started Bandwidth Estimation"
     if msg_type == 'rcv_req':
       response = receive_probe(self.args)
+
+    if msg_type == 'query bw':
+      r = iperf.query_bw(self.args)
+      status_code = r['status_code']
+      response = r['data']
+    if msg_type == 'config iperf server':
+      if iperf.start_server() == 0:
+        status_code = 200
+        response = "iperf server started"
+      else:
+        status_code = 500
+        response = "error: server failed"
     # handle traffic monitoring messages
     if msg_type == 'config counter':
       # send out configuration message to leaf agents
