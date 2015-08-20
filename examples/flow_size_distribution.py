@@ -3,7 +3,7 @@ def config_sketch(addr):
   data = {}
   data['type'] = 'config sketch'
   data['interface'] = 'INPUT'
-  data['proto'] = 'icmp'
+  data['proto'] = 'udp'
 
   url = 'http://' + addr + ':8000'
   response = requests.post(url,data=data)

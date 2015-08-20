@@ -203,7 +203,7 @@ class MyHandler(BaseHTTPRequestHandler):
     return
 
 def run():
-  port = 9000
+  port = 9090
   server_address = ("127.0.0.1",port)
   httpd = HTTPServer(server_address, MyHandler)
   print "monitor is listenning on port" + str(port)

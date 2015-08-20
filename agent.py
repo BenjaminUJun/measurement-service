@@ -71,7 +71,7 @@ def do_bw_estimate(post_msg):
   return
 
 def send_to_monitor(args):
-  port = 9000
+  port = 9090
   url = 'http://127.0.0.1:' + str(port) 
   response = requests.post(url, data=args)
   return response
