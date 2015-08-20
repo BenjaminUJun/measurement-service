@@ -172,13 +172,22 @@ class MyHandler(BaseHTTPRequestHandler):
       r = iperf.query_bw(self.args)
       status_code = r['status_code']
       response = r['data']
+    if msg_type == 'query jitter':
+      r = iperf.query_jitter(self.args)
+      status_code = r['status_code']
+      response = r['data']
     if msg_type == 'config iperf server':
-      if iperf.start_server() == 0:
-        status_code = 200
-        response = "iperf server started"
+      if 'server_mode' in self.args:
+        mode = self.args['server_mode']
+        if iperf.start_server(mode) == 0:
+          status_code = 200
+          response = "iperf server started"
+        else:
+          status_code = 500
+          response = "error: server failed"
       else:
-        status_code = 500
-        response = "error: server failed"
+        status_code = 400
+        response = "bad requst: missing server mode"
     # handle traffic monitoring messages
     if msg_type == 'config counter':
       # send out configuration message to leaf agents
