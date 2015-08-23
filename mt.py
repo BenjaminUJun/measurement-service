@@ -47,24 +47,22 @@ def config_hosts(hosts):
     leaf_addrs = [h.IP() for h in leaf]
     
     p.cmd('python' + work_dir + 'agent.py -a ' + p.IP() + ' -l ' + '\''+str(leaf_addrs)+'\''+ ' &')
-    p.cmd('python' + work_dir + 'monitor.py' + '&') 
 
     if n > 5:
       p1 = hosts[2]
       leaf = hosts[4:2+n/2] 
       leaf_addrs = [h.IP() for h in leaf]
       p1.cmd('python' + work_dir + 'agent.py -a ' + p1.IP() + ' -l ' + '\''+str(leaf_addrs)+'\''+ ' &')
-      p1.cmd('python' + work_dir + 'monitor.py' + '&') 
       p1 = hosts[3]
       leaf = hosts[2+n/2:n] 
       leaf_addrs = [h.IP() for h in leaf]
       p1.cmd('python' + work_dir + 'agent.py -a ' + p1.IP() + ' -l ' + '\''+str(leaf_addrs)+'\''+ ' &')
-      p1.cmd('python' + work_dir + 'monitor.py' + '&') 
 
-    leaf=hosts[4:n]
-    for h in leaf:
-      h.cmd('python' + work_dir + 'agent.py -a ' + h.IP() + ' &')
+    for i,h in enumerate(hosts):
+      if i > 3: 
+        h.cmd('python' + work_dir + 'agent.py -a ' + h.IP() + ' &')
       h.cmd('python' + work_dir + 'monitor.py' + ' &') 
+      h.cmd('~/ditg/bin/ITGRecv &')
     
     # configure counters and sketches on hosts
     time.sleep(0.5)
@@ -115,7 +113,7 @@ def simpleTest(depth,fanout):
 if __name__ == '__main__':
   import argparse
   parser = argparse.ArgumentParser(description='This is SoNIC server')
-  parser.add_argument('-f','--fanout',help='fanout of tree topology',default=2)
+  parser.add_argument('-f','--fanout',help='fanout of tree topology',default=3)
   parser.add_argument('-d','--depth',help='depth of tree topology',default=2)
   args = parser.parse_args()
   # Tell mininet to print useful information
