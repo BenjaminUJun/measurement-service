@@ -102,10 +102,8 @@ def simpleTest(depth,fanout):
   net.pingAll()
   print "Testing measurement service"
   config_hosts(net.hosts)
-  CLI(net)
   net.pingAll()
   send_msg(net.hosts)
-  CLI(net)
   clear_counters(net.hosts)
   CLI(net)
   net.stop()

@@ -7,7 +7,7 @@ def run(src,dst):
 
   url = 'http://'+ src + ':8000'
   r = requests.post(url,data=data)
-  print r.text
+  print r.text + ' MBytes/s'
 
 if __name__ == '__main__':
   import argparse

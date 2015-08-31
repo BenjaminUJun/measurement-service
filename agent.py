@@ -222,7 +222,7 @@ class MyHandler(BaseHTTPRequestHandler):
       r= recursive_query_sketch(self.args)
       status_code = r['status_code']
       response = r['data']
-    if msg_type == 'query heavy hitters':
+    if (msg_type == 'query heavy hitters') | (msg_type == 'query real time counter'):
       r = recursive_query_heavy_hitter(self.args)
       status_code = r['status_code']
       response = r['data']

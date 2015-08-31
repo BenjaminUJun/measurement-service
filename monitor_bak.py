@@ -2,16 +2,13 @@ import sys
 import madoka
 from netfilterqueue import NetfilterQueue
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-import thread, cgi, time
-from threading import Lock
+import thread, cgi
 import logging
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
 
 # global sketch list
 sketch_list= []
-# global netfilter queue
-nfqueue = NetfilterQueue()
 
 # method: add_sketch()
 # description: 
@@ -19,7 +16,7 @@ nfqueue = NetfilterQueue()
 #   then install a rule to iptables, which sends packets to nf queue
 def add_sketch(args):
   import iptables
-  global sketch_list, nfqueue
+  global sketch_list
   # allocate an id to a new sketch
   sketch_id = len(sketch_list)
   s = Sketch()
@@ -38,6 +35,7 @@ def add_sketch(args):
     construct_msg['dst'] = args['dst']
   print iptables.install_rules(construct_msg)
   # bind the queue number with the sketch 
+  nfqueue = NetfilterQueue()
   queue_num = sketch_id
   nfqueue.bind(queue_num, sketch_list[sketch_id].iterate_counters)
   thread.start_new_thread(nfqueue.run,())
@@ -77,25 +75,26 @@ def add_sketch_counter(args):
 class Sketch():
   def __init__(self):
     self.counter_list = []
+    self.pkt_sum = 0
   
   def add_counter(self,c):
     self.counter_list.append(c)
   
   def iterate_counters(self,pkt):
     pkt.accept()
+    self.pkt_sum += 1
     for c in self.counter_list:
       c.count(pkt)
  
   def query_counter(self,key_type,key):
     response={'status_code':400,'data':"error: key not found"}
+    if key_type == 'pkt_sum':
+      response['data'] = self.pkt_sum
+      response['status_code'] = 200
+      return response
     for c in self.counter_list:
       if c.key_type == key_type:
-        if key == 'key_num':
-          response['data'] = c.get_key_num()
-        elif key == 'real_time_key_num':
-          response['data'] = c.get_real_time_key_num()
-        else:
-          response['data'] = c.query_sketch(key)
+        response['data'] = c.query_sketch(key)
         response['status_code'] = 200
     return response
   
@@ -107,48 +106,17 @@ class Sketch():
         response['status_code'] = 200
     return response
 
-  def get_real_time_counter(self,key_type):
-    response={'status_code':400,'data':"error: key not found"}
-    for c in self.counter_list:
-      if c.key_type == key_type:
-        response['data'] = c.get_real_time_counter()
-        response['status_code'] = 200
-    return response
-
 class SketchCounter():
   def __init__(self,key_type='src',increment='pkt',hitter_threshold=0.1):
-    self.sketch = madoka.Sketch()
+    #self.sketch = madoka.Sketch()
+    self.sketch = {}
     self.total_counter = 0
-    self.key_num = 0
     self.heavy_hitter = {}
     self.threshold = hitter_threshold
     self.pkt_threshold = 5
 
     self.key_type = key_type
     self.increment = increment
-    
-    # periodically clear real time counter
-    self.mutex = Lock()
-    self.real_time_counter = {}
-    self.update_circle = 1
-    
-    thread.start_new_thread(self.timer,())
-  
-  def timer(self):
-    while True:
-      time.sleep(self.update_circle)
-      self.mutex.acquire()
-      self.real_time_counter.clear()
-      self.mutex.release()
-  
-  def get_real_time_counter(self):
-    return self.real_time_counter
-  
-  def query_real_time_counter(self,key):
-    if key in self.real_time_counter:
-      return self.real_time_counter[key]
-    else:
-      return 0
 
   def count(self,pkt):
     payload = IP(pkt.get_payload())		
@@ -161,12 +129,6 @@ class SketchCounter():
     if self.key_type == 'src_dst':
       # get the byte length of packet
       key = str(src) + ',' + str(dst)
-    elif self.key_type == 'src_dport':
-      if hasattr(payload.getlayer(IP),'dport'):
-        dport = str(payload.getlayer(IP).dport)
-        key = str(src) + ',' + str(dport) 
-      else:
-        return
     elif self.key_type == 'dst':
       key = str(dst)
     elif self.key_type == 'dport':
@@ -177,26 +139,14 @@ class SketchCounter():
     else:
       # collect src addr distribution by default
       key = str(src)
-    # count the number of different counter keys 
-    if self.query_sketch(key) == 0:
-      self.key_num = self.key_num + 1
     # count increment    
     if self.increment == 'byte':
       byte_len = payload.getlayer(IP).len
       self.sketch[key] = self.query_sketch(key) + byte_len
       self.total_counter += byte_len
-      
-      # update real time counter
-      self.mutex.acquire()
-      self.real_time_counter[key] = self.query_real_time_counter(key) + byte_len
-      self.mutex.release()
     else:
       self.sketch[key] = self.query_sketch(key)  + 1
       self.total_counter += 1
-      # update real time counter
-      self.mutex.acquire()
-      self.real_time_counter[key] = self.query_real_time_counter(key) + 1
-      self.mutex.release()
     # do heavy hitter detection
     self.detect_heavy_hitter(key)
 
@@ -208,17 +158,14 @@ class SketchCounter():
         if key in self.heavy_hitter:
           del self.heavy_hitter[key]
 
-  def get_key_num(self):
-    return self.key_num
-
-  def get_real_time_key_num(self):
-    return len(self.real_time_counter)
-
   def get_sum(self):
     return self.total_counter 
 
   def query_sketch(self,key):
-    return self.sketch[key]
+    if key in self.sketch:
+      return self.sketch[key]
+    else:
+      return 0
   
   def query_sum(self):
     return self.total_counter
@@ -236,10 +183,10 @@ class MyHandler(BaseHTTPRequestHandler):
       if self.args['type'] == 'config sketch':
         statuu_code = 200
         response = add_sketch(self.args)
-      elif self.args['type'] == 'config sketch counter':
+      if self.args['type'] == 'config sketch counter':
         status_code = 200
         response = add_sketch_counter(self.args)
-      elif self.args['type'] == 'query sketch':
+      if self.args['type'] == 'query sketch':
         if ('sketch_id' in self.args) & ('counter_key_type' in self.args) & ('counter_key' in self.args) :
           sketch_id = int(self.args['sketch_id'])
           key_type = self.args['counter_key_type']
@@ -251,7 +198,7 @@ class MyHandler(BaseHTTPRequestHandler):
         else:
           status_code = 400
           response = 'argument missing: sketch id or counter key'
-      elif self.args['type'] == 'query heavy hitters':
+      if self.args['type'] == 'query heavy hitters':
         if ('sketch_id' in self.args) & ('counter_key_type' in self.args):
           sketch_id = int(self.args['sketch_id'])
           key_type = self.args['counter_key_type']
@@ -262,19 +209,6 @@ class MyHandler(BaseHTTPRequestHandler):
         else:
           status_code = 400
           response = 'sketch id or type of counter key is missing'
-      elif self.args['type'] == 'query real time counter':
-        print 'querying real time counter'
-        if ('sketch_id' in self.args) & ('counter_key_type' in self.args):
-          sketch_id = int(self.args['sketch_id'])
-          key_type = self.args['counter_key_type']
-          if sketch_id < len(sketch_list):
-            r = sketch_list[sketch_id].get_real_time_counter(key_type)
-            status_code = r['status_code']
-            response = r['data']
-        else:
-          status_code = 400
-          response = 'sketch id or type of counter key is missing'
-        
      
     self.send_response(status_code)
     self.end_headers()
