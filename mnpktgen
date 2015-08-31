@@ -1,6 +1,0 @@
-h4 ~/ditg/bin/ITGSend -a 10.0.0.6 -C 200 -c 500 -t 1000
-h7 ~/ditg/bin/ITGSend -a 10.0.0.6 -C 600 -c 500 -t 1000
-h8 ~/ditg/bin/ITGSend -a 10.0.0.6 -C 90 -c 500 -t 1000
-h7 ~/ditg/bin/ITGSend -a 10.0.0.5 -C 90 -c 500 -t 1000
-h6 ~/ditg/bin/ITGSend -a 10.0.0.5 -C 90 -c 500 -t 1000
-
