@@ -1,77 +1,53 @@
-def config_sketch(addr):
-  import requests
-  data = {}
-  data['type'] = 'config sketch'
-  data['interface'] = 'INPUT'
-  data['counter_key_type'] = 'src'
-  data['dst'] = addr
-  data['proto'] = 'udp'
+import requests, json, time, ast
+# targeted end-host is h5
+addr = "10.0.0.5"
+# agent programs listen on port 8000
+port = 8000
 
-  url = 'http://' + addr + ':8000'
-  response = requests.post(url,data=data)
+# --------------------------
+# Configuration
+# --------------------------
 
-  return response.text
+# a json message: to apply filter rules on targeted end-host
+data = {'type':  'config sketch', \
+'interface': 'INPUT', \
+'proto' : 'icmp'}
+url = 'http://' + addr + ':' + str(port)
+r = requests.post(url,data=data)
 
-def config_sketch_counter(addr,sketch_id):
-  import requests
-  data = {}
-  data['type'] = 'config sketch counter'
-  data['sketch_id'] = sketch_id
-  data['counter_key_type'] = 'src'
+# Targeted end-hosts response with the sketch id
+sketch_id = int(r.text)
 
-  url = 'http://' + addr + ':8000'
-  response = requests.post(url,data=data)
+# message to configure counter on the sketch
+data = {'type': 'config sketch counter',\
+'sketch_id': sketch_id,\
+'counter_key_type': 'src',\
+'increment': 'pkt'}
+r = requests.post(url,data=data)
 
-  return response.text
+# ---------------------------
+# Query Counters periodically
+# ---------------------------
 
-def query_counter(addr, sketch_id, key, key_type):
-  import requests
-  data = {}
-  data['type'] = 'query sketch'
-  data['sketch_id'] = sketch_id
-  data['counter_key_type'] = key_type
-  data['counter_key'] = key
+while True:
+  # query counters every 5 seconds
+  time.sleep(5)
+
+  # query heavy hitter from the counter
+  data={'type': 'query heavy hitters', \
+'sketch_id': sketch_id, \
+'counter_key_type': 'src'}
+  # targetted end-host response with the heavy hitter records in JSON message
+  r = requests.post(url,data=data)
+  # parse text to json message
+  d = ast.literal_eval(r.text)
+  print json.dumps(d,sort_keys=True,indent=4)
   
-  url = 'http://' + addr + ':8000'
-  response = requests.post(url,data=data)
-  
-  return response.text
-
-def query_heavy_hitter(addr,sketch_id):
-  import requests
-  data = {}
-  data['type'] = 'query heavy hitters'
-  data['sketch_id'] = sketch_id
-  data['counter_key_type'] = 'src'
-
-  url = 'http://' + addr + ':8000'
-  response = requests.post(url,data=data)
-
-  return response
-
-def run(addr,funct,sketch_id,key,key_type):
-  if funct == 'config_sketch':
-    i = config_sketch(addr)
-    print 'sketch id: ' + str(i)
-    config_sketch_counter(addr,i)
-  if funct == 'query_heavy_hitter':
-    if sketch_id >= 0:
-      output = query_heavy_hitter(addr,sketch_id)
-      if output.status_code == 200:
-        import json,ast
-        d = ast.literal_eval(output.text)
-        print json.dumps(d,sort_keys=True,indent=4)
-  if funct == 'query_counter':
-    print query_counter(addr, sketch_id, key, key_type)
-
-if __name__ == '__main__':
-  import argparse
-  parser = argparse.ArgumentParser(description='Tests for network measurement')
-  parser.add_argument('-a','--address',help='server address', required=True)
-  parser.add_argument('-f','--function',help='options: config_sketch/query_counter/query_heavy_hitter', required=True)
-  parser.add_argument('-i','--sketch_id',help='sketch id', default=-1)
-  parser.add_argument('-k','--key',help='counter key', default='')
-  parser.add_argument('-t','--key_type',help='counter key type', default='src')
-  args = parser.parse_args()
-
-  run(args.address,args.function,args.sketch_id,args.key,args.key_type)
+  # query one counter entry by key
+  data={'type': 'query sketch', \
+'sketch_id': sketch_id, \
+'counter_key_type': 'src',\
+'counter_key': '10.0.0.6'}
+  # targetted end-host response with the value
+  r = requests.post(url,data=data)
+  print 'h6 hits: ' +  r.text + 'times'
