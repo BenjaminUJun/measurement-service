@@ -14,7 +14,7 @@ The agent program is responsible to communicate with each end-hosts. More concre
 
 The monitor program is responsible to do measurement tasks. 
 
-#### Virtua Overlay to Integrate Statistics for Global Measurement Tasks
+#### Virtual Overlay to Integrate Statistics for Global Measurement Tasks
 
 In global measurement tasks, agents on end-hosts integrate their statistics on a virtual overlay . The point is to save the integration work for the controller. The controller only needs to interact with the root node of the virtual overlay to do global measurement tasks.
 
@@ -43,7 +43,7 @@ pip install madoka
 ## Basic Example: Query Available Bandwidth
 Let's first create a file with the following lines of codes.
 
-```
+```python
 import requests
 # request available bandwidth with JSON message
 data = {'type' : 'query bw',\
@@ -69,7 +69,7 @@ mininet> h1 python examples/query_bw.py
 ```
 and you get the available bandwidth from h5 to h6
 ```
-1980MBytes/s
+1980 MBytes/s
 ```
 
 
@@ -77,7 +77,7 @@ and you get the available bandwidth from h5 to h6
 
 To monitor the heavy hitter of a certain host, we need to configure counters to collect distribution data. let's first create a file with these few lines of codes.
 
-```
+```python
 import requests, json, time, ast
 # targeted end-host is h5
 addr = "10.0.0.5"
@@ -178,7 +178,8 @@ h6 hits: 2times
 ## Globa monitoring example: flow size distribution monitor
 
 To do this, first create a file with the following cotnets:
-```
+
+```python
 import requests, json, time, ast
 # targeted end-host is root node: h2
 addr = "10.0.0.2"
@@ -277,7 +278,7 @@ For real time measurement tasks, the system provides real time counters to monit
 
 To do this, we still first create a file
 
-```
+```python
 import requests, json, time, ast, re, collections
 # targeted end-host is h5
 addr = "10.0.0.5"
