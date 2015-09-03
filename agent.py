@@ -148,6 +148,14 @@ def recursive_query_heavy_hitter(args):
   response['data'] = dict(h_hitter)
   return response
 
+def send_to_leaf(addr,args):
+  print 'configuring ' + str(addr)
+  url = 'http://' + str(addr) + ':8000'
+  r = requests.post(url,data=args)
+  if r.status_code != 200:
+    print "error: " + r.text
+  
+
 class MyHandler(BaseHTTPRequestHandler):
   def do_POST(self):
     self.query_string = self.rfile.read(int(self.headers['Content-Length']))  
@@ -190,10 +198,13 @@ class MyHandler(BaseHTTPRequestHandler):
         response = "bad requst: missing server mode"
     # handle traffic monitoring messages
     if msg_type == 'config counter':
+      status_code = 200
       # send out configuration message to leaf agents
       for i,addr in enumerate(leaf_agent):
-        url = 'http://'+str(addr)+':8000'
-        requests.post(url,data=self.args)
+        url = 'http://' + str(addr) + ':8000'
+        r = requests.post(url,data=self.args)
+        if r.status_code != 200:
+          status_code = r.status_code
       response = iptables.install_rules(self.args)  
     if msg_type == 'query counter':
       # recursive querying leaf agents
@@ -203,8 +214,7 @@ class MyHandler(BaseHTTPRequestHandler):
     if msg_type == 'config sketch':
       # send out configuration message to leaf agents
       for i,addr in enumerate(leaf_agent):
-        url = 'http://' + str(addr) + ':8000'
-        requests.post(url,data=self.args)
+        thread.start_new_thread(send_to_leaf,(addr,self.args))
       r = send_to_monitor(self.args)
       status_code = r.status_code
       response = r.text
@@ -212,8 +222,7 @@ class MyHandler(BaseHTTPRequestHandler):
       # send out configuration message to leaf agents
       for i,addr in enumerate(leaf_agent):
         # to config global counters on distributed end-hosts, may need to look up sketch id on each end-host, although in experiments they are the same
-        url = 'http://' + str(addr) + ':8000'
-        requests.post(url,data=self.args)
+        thread.start_new_thread(send_to_leaf,(addr,self.args))
       r = send_to_monitor(self.args)
       status_code = r.status_code
       response = r.text
@@ -222,10 +231,21 @@ class MyHandler(BaseHTTPRequestHandler):
       r= recursive_query_sketch(self.args)
       status_code = r['status_code']
       response = r['data']
-    if (msg_type == 'query heavy hitters') | (msg_type == 'query real time counter'):
+    if (msg_type == 'query heavy hitters') or (msg_type == 'query real time counter'):
       r = recursive_query_heavy_hitter(self.args)
       status_code = r['status_code']
       response = r['data']
+    if msg_type == 'add leaf agent':
+      if 'agent_addr' in self.args:
+        leaf_agent.append(self.args['agent_addr'])
+        status_code = 200
+        response = 'leaf agent added'
+    if msg_type == 'query leaf agents':
+      status_code = 200
+      response = leaf_agent
+    
+    if status_code != 200:
+      print 'error: ' + str(response)
 
     self.send_response(status_code)
     self.end_headers()

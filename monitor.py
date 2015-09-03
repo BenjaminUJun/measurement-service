@@ -234,7 +234,7 @@ class MyHandler(BaseHTTPRequestHandler):
     status_code = 400 
     if 'type' in self.args:
       if self.args['type'] == 'config sketch':
-        statuu_code = 200
+        status_code = 200
         response = add_sketch(self.args)
       elif self.args['type'] == 'config sketch counter':
         status_code = 200
