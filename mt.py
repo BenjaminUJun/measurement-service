@@ -6,8 +6,11 @@ from mininet.net import Mininet
 from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel
 from mininet.cli import CLI
+from mininet.node import OVSController
 
-import pprint, requests
+import pprint, requests, time
+
+work_dir = ' /home/vagrant/measurement-service/'
 
 class CircleSwitchTopo(Topo):
   "switches connected into circle."
@@ -36,8 +39,6 @@ class SingleSwitchTopo(Topo):
 
 # run monitor and agent on each hosts
 def config_hosts(hosts):
-  work_dir = ' /home/mininet/measurement-service/'
-
   # start agent and monitor
   for h in hosts:
     h.cmd('python' + work_dir + 'agent.py -a ' + h.IP() + ' &')
@@ -45,7 +46,6 @@ def config_hosts(hosts):
 
 def setup_tree_overlay(hosts, depth, fan):
   import time,math
-  work_dir = ' /home/mininet/measurement-service/'
   # configure virtual overlay   
   for i,h in enumerate(hosts):
     for d in range(depth):
@@ -57,7 +57,6 @@ def setup_tree_overlay(hosts, depth, fan):
     # print h.cmd('python' + work_dir + 'tests/add_leaf.py -f display' + ' -r ' + h.IP() )
 
 def setup_without_overlay(hosts):
-  work_dir = ' /home/mininet/measurement-service/'
   r = hosts[0]
   for i,h in enumerate(hosts):
     if i > 0:
@@ -66,16 +65,15 @@ def setup_without_overlay(hosts):
   # print r.cmd('python' + work_dir + 'tests/add_leaf.py -f display' + ' -r ' + r.IP() )
 
 def config_counters(hosts):
-  work_dir = ' /home/mininet/measurement-service/'
   # configure counters and sketches on hosts
   c = hosts[1]
   r = hosts[0]
-  c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + r.IP() + ' -f config_counters') 
-  c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + r.IP() + ' -f config_sketch') 
+  print 'checking monitor availability... ' + r.cmd('jobs')
+  print c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + r.IP() + ' -f config_counters') 
+  print c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + r.IP() + ' -f config_sketch') 
 
 # send messages to do measurements
 def send_msg(hosts):
-  work_dir = ' /home/mininet/measurement-service/'
   if len(hosts) > 1:
     # fake one host as controller and send configuration messages to other hosts
     c = hosts[1]
@@ -87,7 +85,6 @@ def send_msg(hosts):
     print c.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + p.IP() + ' -f query_heavy_hitters' )
 
 def clear_counters(hosts):
-  work_dir = ' /home/mininet/measurement-service/'
   for i,h in enumerate(hosts):
     ip = h.IP() 
     h.cmd('python' + work_dir + 'tests/config_counters.py' + ' -a ' + ip + ' -f clear_counters' + '&')
@@ -96,7 +93,7 @@ def simpleTest(depth,fanout):
   "Create and test a simple network"
 #  topo = SingleSwitchTopo(n=6)
   topo = TreeTopo(depth=depth,fanout=fanout)
-  net = Mininet(topo)
+  net = Mininet(topo=topo,controller=OVSController)
   net.start()
   print "Dumping host connections"
   dumpNodeConnections(net.hosts)
@@ -105,10 +102,13 @@ def simpleTest(depth,fanout):
   
   # configure for monitoring
   config_hosts(net.hosts)
+  time.sleep(1)
   setup_without_overlay(net.hosts)
   # setup_tree_overlay(net.hosts, depth, fanout)
   config_counters(net.hosts)
+  CLI(net)
   send_msg(net.hosts)
+  CLI(net)
   clear_counters(net.hosts)
   CLI(net)
   net.stop()

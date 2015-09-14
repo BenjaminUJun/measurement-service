@@ -40,6 +40,14 @@ install count-min sketch python lib
 pip install madoka
 ```
 
+install scapy
+```
+wget http://www.secdev.org/projects/scapy/files/scapy-2.3.1.zip 
+unzip scapy-latest.zip
+cd scapy-2.*
+sudo python setup.py install
+```
+
 ## Basic Example: Query Available Bandwidth
 Let's first create a file with the following lines of codes.
 
