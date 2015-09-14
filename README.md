@@ -20,27 +20,28 @@ In global measurement tasks, agents on end-hosts integrate their statistics on a
 
 ## Installation
 
-some python libs need to be installed to support the system functionality
+1. mininet
+first download mininet vm at https://github.com/mininet/mininet/wiki/Mininet-VM-Images
 
-install python development files
+2. install python development files
 
 ```
 apt-get install build-essential python-dev libnetfilter-queue-dev
 ```
 
-install Netfilter Queue python lib
+3. install Netfilter Queue python lib
 
 ```
 pip install NetfilterQueue
 ```
 
-install count-min sketch python lib
+4. install count-min sketch python lib
 
 ```
 pip install madoka
 ```
 
-install scapy
+5. install scapy
 ```
 wget http://www.secdev.org/projects/scapy/files/scapy-2.3.1.zip 
 unzip scapy-latest.zip
