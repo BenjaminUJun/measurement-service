@@ -1,6 +1,6 @@
 import requests, json, time, ast
 # targeted end-host is root node: h2
-addr = "10.0.0.2"
+addr = "10.0.0.1"
 # agent programs listen on port 8000
 port = 8000
 

@@ -39,8 +39,14 @@ def add_sketch(args):
   print iptables.install_rules(construct_msg)
   # bind the queue number with the sketch 
   queue_num = sketch_id
-  nfqueue.bind(queue_num, sketch_list[sketch_id].iterate_counters)
-  thread.start_new_thread(nfqueue.run,())
+  print 'try to add sketch with local sketch id: ' + str(sketch_id)
+  try:
+    nfqueue.bind(queue_num, sketch_list[sketch_id].iterate_counters)
+    print 'done with local sketch id: ' + str(sketch_id)
+    thread.start_new_thread(nfqueue.run,())
+  except Exception as x:
+    print 'add sketch failed'
+    print x
   return sketch_id
 
 def add_sketch_counter(args):
@@ -83,6 +89,7 @@ class Sketch():
   
   def iterate_counters(self,pkt):
     pkt.accept()
+    print 'pkt filtered and accpeted'
     for c in self.counter_list:
       c.count(pkt)
  

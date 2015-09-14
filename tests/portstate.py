@@ -6,9 +6,11 @@ def run(switch, port):
   output = subprocess.check_output(cmd, shell= True)
   result= re.findall('bytes=\d+', output)
   state1 = re.findall('\d+',str(result))
+  print 'counting elapsed time...'
   t = time.time()
   subprocess.check_output('python tests/flow.py -f query -i 1', shell=True)
   elapsed_time = time.time() - t
+  print 'timing finished'
   output = subprocess.check_output(cmd, shell=True)
   result= re.findall('bytes=\d+', output)
   state2 = re.findall('\d+',str(result))

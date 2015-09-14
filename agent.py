@@ -1,7 +1,7 @@
 #!/usr/bin/env python
  
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-import cgi, subprocess, requests, thread, argparse, time, re
+import cgi, subprocess, requests, thread, argparse, time, re, threading
 import iptables, iperf
 
 def send_probe():
@@ -123,41 +123,107 @@ def recursive_query_sketch(args):
   response['data'] = count
   return response
     
+def query_leaf_haevy_hitter(addr, args):
+  from collections import Counter
+  import ast 
+  
+  global g_h_hitter, response_counter
+  url = 'http://' + addr + ':8000' 
+  r = requests.post(url, data=args)
+  print 'querying ' + addr
+  try:
+    r = send_to_monitor(args)
+    if r.status_code == 200:
+      leaf_hitter = ast.literal_eval(r.text)
+      mutex.acquire()
+      g_h_hitter = Counter(g_h_hitter) + Counter(leaf_hitter)
+      response_counter = response_counter + 1
+      mutex.release()
+  except Exception as x:
+    print x
+
+  print 'finished query ' + addr
+
 def recursive_query_heavy_hitter(args):
   from collections import Counter
   import ast 
+  global g_h_hitter, response_counter, leaf_agent
+  # reset the global variable before use
+  g_h_hitter = 0
+  response_counter = 0
   response = {'status_code':200,'data':{}}
-  h_hitter = {}
   r = send_to_monitor(args)
   if r.status_code == 200:
-    h_hitter = ast.literal_eval(r.text)
+    g_h_hitter = ast.literal_eval(r.text)
   else:
     response['status_code'] = r.status_code
     response['data'] = r.text
     return response
+  
+  threads = []
 
   for addr in leaf_agent:
-    url = 'http://' + addr + ':8000' 
-    r = requests.post(url,data=args)
-    if r.status_code == 200:
-      leaf_hitter = ast.literal_eval(r.text)
-      h_hitter = Counter(h_hitter) + Counter(leaf_hitter)
-    else:
-      response['status_code'] = 500
+    print 'try to query ' + addr
+    t = threading.Thread(target = query_leaf_haevy_hitter,args = (addr,args))
+    t.setName(addr)
+    t.daemon = True
+    t.start()
+    threads.append(t)
 
-  response['data'] = dict(h_hitter)
+  for t in threads:
+    t.join(0.3)
+    if t.isAlive():
+      print 'warning: timeout happened in querying' + t.getName()
+  
+  print 'query from ' +  str(response_counter) + 'agents'
+  print dict(g_h_hitter)
+
+  response['data'] = dict(g_h_hitter)
   return response
 
 def send_to_leaf(addr,args):
   print 'configuring ' + str(addr)
   url = 'http://' + str(addr) + ':8000'
-  r = requests.post(url,data=args)
-  if r.status_code != 200:
-    print "error: " + r.text
-  
+  try: 
+    r = requests.post(url,data=args)
+    if r.status_code != 200:
+      print "error: " + r.text
+  except Exception as x:
+    print x
 
+def recursive_config(args):
+  global leaf_agent
+  # reset the global variable before use
+  response = {'status_code':200,'data':{}}
+  try:
+    r = send_to_monitor(args)
+    if r.status_code == 200:
+      response['data'] = 'configuration done.'
+  except Exception as x:
+    response['data'] = 'configuration failed.'
+    print x
+  
+  threads = []
+
+  for addr in leaf_agent:
+    print 'try to config' + addr
+    t = threading.Thread(target = send_to_leaf,args = (addr,args))
+    t.setName(addr)
+    t.daemon = True
+    t.start()
+    threads.append(t)
+
+  for t in threads:
+    t.join(0.3)
+    if t.isAlive():
+      print 'warning: timeout happened in configuring' + t.getName()
+
+  return response
+
+  
 class MyHandler(BaseHTTPRequestHandler):
   def do_POST(self):
+    global leaf_agent
     self.query_string = self.rfile.read(int(self.headers['Content-Length']))  
     self.args = dict(cgi.parse_qsl(self.query_string))
     status_code = 400
@@ -270,6 +336,11 @@ def run(addr,port):
 
 # gloabal vriable: for storing the ip of leaf notes
 leaf_agent = []
+
+# for multithread syncronization
+response_counter = 0
+g_h_hitter = {}
+mutex = threading.Lock()
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='This is SoNIC server')

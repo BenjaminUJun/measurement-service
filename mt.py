@@ -53,8 +53,8 @@ def setup_tree_overlay(hosts, depth, fan):
         for f in range(fan-1):
           leaf_id = i + int(math.pow(fan,d)) * (f+1)
           h.cmd('python' + work_dir + 'tests/add_leaf.py -f add' + ' -r ' + h.IP() + ' -l ' + hosts[leaf_id].IP() )
-    print 'leaf node of h' + str(i+1)
-    print h.cmd('python' + work_dir + 'tests/add_leaf.py -f display' + ' -r ' + h.IP() )
+    # print 'leaf node of h' + str(i+1)
+    # print h.cmd('python' + work_dir + 'tests/add_leaf.py -f display' + ' -r ' + h.IP() )
 
 def setup_without_overlay(hosts):
   work_dir = ' /home/mininet/measurement-service/'
@@ -62,8 +62,8 @@ def setup_without_overlay(hosts):
   for i,h in enumerate(hosts):
     if i > 0:
       r.cmd('python' + work_dir + 'tests/add_leaf.py -f add' + ' -r ' + r.IP() + ' -l ' + h.IP() )
-  print 'leaf nodes of h1'
-  print r.cmd('python' + work_dir + 'tests/add_leaf.py -f display' + ' -r ' + r.IP() )
+  # print 'leaf nodes of h1'
+  # print r.cmd('python' + work_dir + 'tests/add_leaf.py -f display' + ' -r ' + r.IP() )
 
 def config_counters(hosts):
   work_dir = ' /home/mininet/measurement-service/'
@@ -105,10 +105,9 @@ def simpleTest(depth,fanout):
   
   # configure for monitoring
   config_hosts(net.hosts)
-  # setup_without_overlay(net.hosts)
-  setup_tree_overlay(net.hosts, depth, fanout)
+  setup_without_overlay(net.hosts)
+  # setup_tree_overlay(net.hosts, depth, fanout)
   config_counters(net.hosts)
-  CLI(net)
   send_msg(net.hosts)
   clear_counters(net.hosts)
   CLI(net)
