@@ -10,7 +10,8 @@ from mininet.node import OVSController
 
 import pprint, requests, time
 
-work_dir = ' /home/vagrant/measurement-service/'
+# work_dir = ' /home/mininet/measurement-service/'
+work_dir = ' ./'
 
 class CircleSwitchTopo(Topo):
   "switches connected into circle."
